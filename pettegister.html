@@ -1,0 +1,635 @@
+<!DOCTYPE html>
+<html lang="th">
+<head>
+    <meta charset="UTF-8">
+    <meta name="viewport" content="width=device-width, initial-scale=1.0, maximum-scale=1.0, user-scalable=no">
+    <title>ระบบลงทะเบียนสัตว์เลี้ยง - หมู่บ้านจัดสรร (Online)</title>
+    <!-- Tailwind CSS -->
+    <script src="https://cdn.tailwindcss.com"></script>
+    <!-- Font Awesome -->
+    <link rel="stylesheet" href="https://cdnjs.cloudflare.com/ajax/libs/font-awesome/6.4.0/css/all.min.css">
+    <!-- Google Fonts: Sarabun -->
+    <link href="https://fonts.googleapis.com/css2?family=Sarabun:wght@300;400;500;600;700&display=swap" rel="stylesheet">
+    <!-- Supabase JS Client -->
+    <script src="https://cdn.jsdelivr.net/npm/@supabase/supabase-js@2"></script>
+
+    <script>
+        // ==========================================
+        // ⚙️ ตั้งค่า Supabase
+        // ==========================================
+        const SUPABASE_URL = 'https://dueckgfsbageeomiybav.supabase.co';
+        const SUPABASE_KEY = 'eyJhbGciOiJIUzI1NiIsInR5cCI6IkpXVCJ9.eyJpc3MiOiJzdXBhYmFzZSIsInJlZiI6ImR1ZWNrZ2ZzYmFnZWVvbWl5YmF2Iiwicm9sZSI6ImFub24iLCJpYXQiOjE3Njg3MzU4MjEsImV4cCI6MjA4NDMxMTgyMX0.69yySB2muOFaG51Wu1l2ZxDjbYgpNOiBxR2Wjy0Y10s';
+        
+        // Initialize Client
+        const supabaseClient = window.supabase.createClient(SUPABASE_URL, SUPABASE_KEY);
+
+        tailwind.config = {
+            theme: {
+                extend: {
+                    colors: {
+                        primary: '#10b981', // Emerald 500
+                        secondary: '#4f46e5', // Indigo 600
+                        accent: '#f59e0b', // Amber 500
+                    },
+                    fontFamily: {
+                        sans: ['Sarabun', 'sans-serif'],
+                    }
+                }
+            }
+        }
+    </script>
+
+    <style>
+        body {
+            font-family: 'Sarabun', sans-serif;
+            background-color: #f0f4f8;
+            background-image: radial-gradient(#e5e7eb 1px, transparent 1px);
+            background-size: 20px 20px;
+        }
+        .glass-nav {
+            background: rgba(255, 255, 255, 0.9);
+            backdrop-filter: blur(12px);
+            border-bottom: 1px solid rgba(255, 255, 255, 0.3);
+        }
+        .image-preview {
+            width: 100%;
+            height: 220px;
+            object-fit: cover;
+            border-radius: 1rem;
+            display: none;
+            box-shadow: 0 4px 6px -1px rgba(0, 0, 0, 0.1);
+        }
+        .fade-in {
+            animation: fadeIn 0.5s ease-in-out;
+        }
+        @keyframes fadeIn {
+            from { opacity: 0; transform: translateY(10px); }
+            to { opacity: 1; transform: translateY(0); }
+        }
+        /* Loading Overlay */
+        #loadingOverlay {
+            background: rgba(255, 255, 255, 0.8);
+            backdrop-filter: blur(4px);
+        }
+    </style>
+</head>
+<body class="text-slate-800 antialiased selection:bg-primary selection:text-white pb-20 lg:pb-0">
+
+    <!-- Navbar -->
+    <nav class="glass-nav sticky top-0 z-50 shadow-sm transition-all duration-300">
+        <div class="max-w-7xl mx-auto px-4 py-3 flex items-center justify-between">
+            <div class="flex items-center gap-3">
+                <div class="bg-gradient-to-tr from-primary to-emerald-300 w-10 h-10 rounded-xl flex items-center justify-center text-white shadow-lg shadow-emerald-200">
+                    <i class="fa-solid fa-cloud text-lg"></i>
+                </div>
+                <div>
+                    <h1 class="text-lg font-bold leading-tight text-slate-800">PetRegister <span class="text-primary text-xs bg-emerald-100 px-2 py-0.5 rounded-full">Online</span></h1>
+                    <p class="text-xs text-slate-500">ระบบฐานข้อมูลหมู่บ้าน</p>
+                </div>
+            </div>
+            
+            <button onclick="scrollToForm()" class="hidden md:flex bg-slate-900 text-white px-5 py-2.5 rounded-xl text-sm font-semibold hover:bg-slate-800 transition shadow-lg hover:shadow-xl active:scale-95 items-center gap-2">
+                <i class="fa-solid fa-plus"></i> ลงทะเบียน
+            </button>
+
+            <button onclick="scrollToForm()" class="md:hidden w-10 h-10 bg-slate-100 rounded-full flex items-center justify-center text-primary active:bg-slate-200">
+                <i class="fa-solid fa-plus text-lg"></i>
+            </button>
+        </div>
+    </nav>
+
+    <div class="max-w-7xl mx-auto px-4 py-6 grid grid-cols-1 lg:grid-cols-12 gap-8 items-start">
+        
+        <!-- Left Side: Registration Form -->
+        <div class="lg:col-span-4 order-2 lg:order-1" id="registerSection">
+            <div class="bg-white rounded-3xl shadow-xl shadow-slate-200/50 p-6 sticky top-24 border border-slate-100">
+                <div class="mb-6">
+                    <span class="bg-emerald-100 text-emerald-700 text-xs font-bold px-3 py-1 rounded-full uppercase tracking-wider">Storage Mode</span>
+                    <h2 class="text-2xl font-bold text-slate-800 mt-2">ลงทะเบียนสัตว์เลี้ยง</h2>
+                    <p class="text-slate-500 text-sm">รูปภาพจะถูกเก็บใน Storage Bucket "img"</p>
+                </div>
+
+                <form id="petForm" onsubmit="handleRegister(event)" class="space-y-5">
+                    
+                    <div class="space-y-4">
+                        <div class="flex items-center gap-2 text-secondary font-semibold border-b border-slate-100 pb-2">
+                            <i class="fa-regular fa-id-card"></i> ข้อมูลเจ้าของ
+                        </div>
+                        
+                        <div>
+                            <label class="block text-sm font-medium text-slate-700 mb-1.5 ml-1">ชื่อ-นามสกุล</label>
+                            <input type="text" id="ownerName" required 
+                                class="w-full px-4 py-3 bg-slate-50 border-0 rounded-2xl focus:ring-2 focus:ring-primary/50 focus:bg-white transition-all outline-none placeholder:text-slate-400" 
+                                placeholder="เช่น คุณสมชาย รักสัตว์">
+                        </div>
+
+                        <div class="grid grid-cols-5 gap-3">
+                            <div class="col-span-3">
+                                <label class="block text-sm font-medium text-slate-700 mb-1.5 ml-1">บ้านเลขที่</label>
+                                <input type="text" id="houseNo" required 
+                                    class="w-full px-4 py-3 bg-slate-50 border-0 rounded-2xl focus:ring-2 focus:ring-primary/50 focus:bg-white transition-all outline-none placeholder:text-slate-400" 
+                                    placeholder="99/99">
+                            </div>
+                            <div class="col-span-2">
+                                <label class="block text-sm font-medium text-slate-700 mb-1.5 ml-1">ซอย</label>
+                                <input type="text" id="soi" 
+                                    class="w-full px-4 py-3 bg-slate-50 border-0 rounded-2xl focus:ring-2 focus:ring-primary/50 focus:bg-white transition-all outline-none text-center" 
+                                    placeholder="5">
+                            </div>
+                        </div>
+
+                        <div>
+                            <label class="block text-sm font-medium text-slate-700 mb-1.5 ml-1">เบอร์โทรศัพท์</label>
+                            <div class="relative">
+                                <i class="fa-solid fa-phone absolute left-4 top-3.5 text-slate-400"></i>
+                                <input type="tel" id="phone" required inputmode="numeric"
+                                    class="w-full pl-10 pr-4 py-3 bg-slate-50 border-0 rounded-2xl focus:ring-2 focus:ring-primary/50 focus:bg-white transition-all outline-none placeholder:text-slate-400" 
+                                    placeholder="08x-xxx-xxxx">
+                            </div>
+                        </div>
+                    </div>
+
+                    <div class="space-y-4 pt-2">
+                        <div class="flex items-center gap-2 text-accent font-semibold border-b border-slate-100 pb-2">
+                            <i class="fa-solid fa-cat"></i> ข้อมูลสัตว์เลี้ยง
+                        </div>
+
+                        <div class="grid grid-cols-2 gap-3">
+                            <div>
+                                <label class="block text-sm font-medium text-slate-700 mb-1.5 ml-1">ประเภท</label>
+                                <div class="relative">
+                                    <select id="petType" class="w-full px-4 py-3 bg-slate-50 border-0 rounded-2xl focus:ring-2 focus:ring-accent/50 focus:bg-white transition-all outline-none appearance-none">
+                                        <option value="สุนัข">🐕 สุนัข</option>
+                                        <option value="แมว">🐈 แมว</option>
+                                        <option value="นก">🦜 นก</option>
+                                        <option value="กระต่าย">🐇 กระต่าย</option>
+                                        <option value="อื่นๆ">🐾 อื่นๆ</option>
+                                    </select>
+                                    <i class="fa-solid fa-chevron-down absolute right-4 top-4 text-slate-400 text-xs pointer-events-none"></i>
+                                </div>
+                            </div>
+                            <div>
+                                <label class="block text-sm font-medium text-slate-700 mb-1.5 ml-1">ชื่อเรียก</label>
+                                <input type="text" id="petName" required 
+                                    class="w-full px-4 py-3 bg-slate-50 border-0 rounded-2xl focus:ring-2 focus:ring-accent/50 focus:bg-white transition-all outline-none placeholder:text-slate-400" 
+                                    placeholder="น้องถุงทอง">
+                            </div>
+                        </div>
+
+                        <div>
+                            <label class="block text-sm font-medium text-slate-700 mb-2 ml-1">รูปถ่ายสัตว์เลี้ยง</label>
+                            <div class="group relative w-full h-56 border-2 border-dashed border-slate-300 rounded-2xl hover:bg-slate-50 hover:border-primary transition-all cursor-pointer flex flex-col items-center justify-center overflow-hidden" 
+                                onclick="document.getElementById('petImage').click()">
+                                
+                                <div class="space-y-2 text-center z-10 p-4 transition-all duration-300" id="uploadPlaceholder">
+                                    <div class="w-14 h-14 bg-slate-100 rounded-full flex items-center justify-center mx-auto text-slate-400 group-hover:text-primary group-hover:scale-110 transition-all">
+                                        <i class="fa-solid fa-camera text-2xl"></i>
+                                    </div>
+                                    <div>
+                                        <p class="font-medium text-slate-600">แตะเพื่ออัพโหลดรูป</p>
+                                        <p class="text-xs text-slate-400 mt-1">รองรับ JPG, PNG (Max 10MB)</p>
+                                    </div>
+                                </div>
+
+                                <img id="preview" class="image-preview absolute inset-0 z-20">
+                                <input id="petImage" type="file" class="sr-only" accept="image/*" onchange="previewImage(this)">
+                                
+                                <button type="button" id="removeImgBtn" onclick="removeImage(event)" 
+                                    class="hidden absolute top-2 right-2 z-30 bg-white/90 text-red-500 w-8 h-8 rounded-full shadow-md hover:scale-110 transition flex items-center justify-center">
+                                    <i class="fa-solid fa-times"></i>
+                                </button>
+                            </div>
+                        </div>
+                    </div>
+
+                    <button type="submit" id="submitBtn" class="w-full bg-gradient-to-r from-primary to-emerald-600 text-white font-bold py-4 rounded-2xl shadow-lg shadow-emerald-200 hover:shadow-emerald-300 hover:-translate-y-1 active:translate-y-0 transition-all text-lg flex items-center justify-center gap-2 group">
+                        <span>บันทึกข้อมูล</span>
+                        <i class="fa-solid fa-arrow-right group-hover:translate-x-1 transition-transform"></i>
+                    </button>
+                </form>
+            </div>
+        </div>
+
+        <!-- Right Side: Display List -->
+        <div class="lg:col-span-8 order-1 lg:order-2">
+            <div class="bg-white rounded-3xl p-2 shadow-sm mb-8 flex items-center gap-2 border border-slate-100 sticky top-20 z-40 md:static">
+                <div class="flex-1 relative">
+                    <i class="fa-solid fa-search absolute left-5 top-1/2 -translate-y-1/2 text-slate-400"></i>
+                    <input type="text" id="searchInput" onkeyup="filterPets()" 
+                        placeholder="ค้นหาชื่อ, บ้านเลขที่..." 
+                        class="w-full pl-12 pr-4 py-3.5 bg-transparent border-none focus:ring-0 text-slate-700 placeholder:text-slate-400 rounded-2xl outline-none">
+                </div>
+                <div class="bg-slate-100 px-4 py-2 rounded-2xl text-sm font-semibold text-slate-500 whitespace-nowrap hidden sm:block">
+                    ทั้งหมด <span id="count" class="text-primary">...</span> รายการ
+                </div>
+            </div>
+
+            <div id="petGrid" class="grid grid-cols-1 md:grid-cols-2 xl:grid-cols-3 gap-6 pb-20">
+                <!-- Javascript will populate this -->
+            </div>
+
+            <div id="emptyState" class="hidden flex flex-col items-center justify-center py-20 text-center">
+                <div class="w-40 h-40 bg-slate-100 rounded-full flex items-center justify-center mb-6">
+                    <i class="fa-solid fa-paw text-6xl text-slate-300"></i>
+                </div>
+                <h3 class="text-xl font-bold text-slate-700">ยังไม่มีข้อมูลในระบบ</h3>
+                <p class="text-slate-500 mt-2 max-w-xs mx-auto">เชื่อมต่อ Supabase เพื่อเริ่มใช้งาน</p>
+            </div>
+        </div>
+    </div>
+
+    <!-- Loading Overlay -->
+    <div id="loadingOverlay" class="fixed inset-0 z-[100] hidden flex flex-col items-center justify-center">
+        <i class="fa-solid fa-circle-notch fa-spin text-4xl text-primary mb-3"></i>
+        <p class="text-slate-600 font-medium">กำลังโหลดข้อมูล...</p>
+    </div>
+
+    <!-- Toast Notification -->
+    <div id="toast" class="fixed bottom-6 left-1/2 -translate-x-1/2 transform translate-y-32 opacity-0 transition-all duration-500 z-[60] w-max max-w-[90vw]">
+        <div class="glass-effect bg-slate-800/90 text-white px-6 py-3.5 rounded-full shadow-2xl flex items-center gap-3 backdrop-blur-md">
+            <div class="bg-emerald-500 rounded-full p-1"><i class="fa-solid fa-check text-xs"></i></div>
+            <span id="toastMessage" class="font-medium text-sm">บันทึกข้อมูลเรียบร้อย</span>
+        </div>
+    </div>
+
+    <script>
+        // State management
+        let pets = [];
+        let currentImageBase64 = null;
+
+        // Initialize
+        document.addEventListener('DOMContentLoaded', () => {
+            fetchPets();
+        });
+
+        // ==========================================
+        // 🔄 Supabase Functions
+        // ==========================================
+
+        async function fetchPets() {
+            setLoading(true);
+            const { data, error } = await supabaseClient
+                .from('pets')
+                .select('*')
+                .order('created_at', { ascending: false });
+
+            if (error) {
+                console.error('Error fetching pets:', error);
+                showToast('เกิดข้อผิดพลาดในการโหลดข้อมูล', true);
+            } else {
+                pets = data;
+                renderPets(pets);
+            }
+            setLoading(false);
+        }
+
+        // Helper: Convert Base64 back to Blob for Upload
+        function dataURLtoBlob(dataurl) {
+            var arr = dataurl.split(','), mime = arr[0].match(/:(.*?);/)[1],
+                bstr = atob(arr[1]), n = bstr.length, u8arr = new Uint8Array(n);
+            while(n--){
+                u8arr[n] = bstr.charCodeAt(n);
+            }
+            return new Blob([u8arr], {type:mime});
+        }
+
+        async function handleRegister(e) {
+            e.preventDefault();
+            setLoading(true);
+
+            let publicImageUrl = null;
+
+            // 1. Upload Image to Storage "img" if exists
+            if (currentImageBase64) {
+                try {
+                    const blob = dataURLtoBlob(currentImageBase64);
+                    // Create unique filename
+                    const fileName = `pet-${Date.now()}-${Math.floor(Math.random() * 1000)}.jpg`;
+                    
+                    // Upload to 'img' bucket
+                    const { data: uploadData, error: uploadError } = await supabaseClient
+                        .storage
+                        .from('img')
+                        .upload(fileName, blob, {
+                            cacheControl: '3600',
+                            upsert: false
+                        });
+
+                    if (uploadError) {
+                        console.error('Upload Error:', uploadError);
+                        // ถ้าหา Bucket ไม่เจอ แจ้งเตือน user
+                        if(uploadError.message.includes('Bucket not found')) {
+                            alert('ไม่พบ Bucket ชื่อ "img" กรุณาสร้าง Bucket ใน Supabase ก่อน');
+                            setLoading(false);
+                            return;
+                        }
+                        throw uploadError;
+                    }
+
+                    // Get Public URL
+                    const { data: { publicUrl } } = supabaseClient
+                        .storage
+                        .from('img')
+                        .getPublicUrl(fileName);
+                    
+                    publicImageUrl = publicUrl;
+
+                } catch (err) {
+                    showToast('อัพโหลดรูปภาพไม่สำเร็จ: ' + err.message, true);
+                    setLoading(false);
+                    return;
+                }
+            }
+
+            // 2. Save Data to Database
+            const newPet = {
+                ownername: document.getElementById('ownerName').value,
+                houseno: document.getElementById('houseNo').value,
+                soi: document.getElementById('soi').value || '-',
+                phone: document.getElementById('phone').value,
+                pettype: document.getElementById('petType').value,
+                petname: document.getElementById('petName').value,
+                image: publicImageUrl // Store the URL instead of base64
+            };
+
+            const { data, error } = await supabaseClient
+                .from('pets')
+                .insert([newPet])
+                .select();
+
+            if (error) {
+                console.error('Error inserting:', error);
+                showToast('เกิดข้อผิดพลาด: ' + error.message, true);
+            } else {
+                showToast('บันทึกข้อมูลเรียบร้อย');
+                resetForm();
+                fetchPets(); 
+                
+                if(window.innerWidth < 1024) {
+                    document.getElementById('searchInput').scrollIntoView({ behavior: 'smooth', block: 'start' });
+                }
+            }
+            setLoading(false);
+        }
+
+        async function deletePet(id) {
+            if(!confirm('ต้องการลบข้อมูลนี้ออกจากระบบ?')) return;
+            setLoading(true);
+
+            // 1. Get image info first to delete file from storage
+            const { data: petData } = await supabaseClient
+                .from('pets')
+                .select('image')
+                .eq('id', id)
+                .single();
+
+            // 2. Delete from Storage if image exists
+            if (petData && petData.image && petData.image.includes('/img/')) {
+                try {
+                    // Extract filename from URL 
+                    // Example: .../storage/v1/object/public/img/filename.jpg -> filename.jpg
+                    const urlParts = petData.image.split('/img/');
+                    if (urlParts.length > 1) {
+                        const filePath = urlParts[1];
+                        await supabaseClient.storage.from('img').remove([filePath]);
+                    }
+                } catch (err) {
+                    console.warn('Could not delete image file:', err);
+                    // Continue to delete record anyway
+                }
+            }
+            
+            // 3. Delete Record
+            const { error } = await supabaseClient
+                .from('pets')
+                .delete()
+                .eq('id', id);
+
+            if (error) {
+                showToast('ลบข้อมูลไม่สำเร็จ', true);
+            } else {
+                showToast('ลบข้อมูลเรียบร้อย');
+                fetchPets();
+            }
+            setLoading(false);
+        }
+
+        // ==========================================
+        // 🖼️ Image Handling
+        // ==========================================
+        function previewImage(input) {
+            if (input.files && input.files[0]) {
+                const file = input.files[0];
+                
+                // เพิ่มลิมิตไฟล์ต้นฉบับเป็น 10MB (เพราะเดี๋ยวเราจะย่อมันลงอีก)
+                if (file.size > 10 * 1024 * 1024) {
+                    showToast('ไฟล์ภาพขนาดใหญ่เกินไป (ต้องไม่เกิน 10MB)', true);
+                    input.value = '';
+                    return;
+                }
+
+                const reader = new FileReader();
+                reader.onload = function(e) {
+                    // สร้าง Element รูปภาพจำลองเพื่อคำนวณขนาด
+                    const img = new Image();
+                    img.src = e.target.result;
+                    
+                    img.onload = function() {
+                        // สร้าง Canvas สำหรับวาดและย่อรูป
+                        const canvas = document.createElement('canvas');
+                        const ctx = canvas.getContext('2d');
+                        
+                        // กำหนดขนาดสูงสุด (Max Width/Height)
+                        const MAX_WIDTH = 800;
+                        const MAX_HEIGHT = 800;
+                        let width = img.width;
+                        let height = img.height;
+
+                        // คำนวณ Aspect Ratio เพื่อรักษาสัดส่วน
+                        if (width > height) {
+                            if (width > MAX_WIDTH) {
+                                height *= MAX_WIDTH / width;
+                                width = MAX_WIDTH;
+                            }
+                        } else {
+                            if (height > MAX_HEIGHT) {
+                                width *= MAX_HEIGHT / height;
+                                height = MAX_HEIGHT;
+                            }
+                        }
+
+                        canvas.width = width;
+                        canvas.height = height;
+
+                        // วาดรูปลงบน Canvas ตามขนาดใหม่
+                        ctx.drawImage(img, 0, 0, width, height);
+                        
+                        // แปลงกลับเป็น Base64 แบบ JPEG คุณภาพ 70% (0.7)
+                        const compressedDataUrl = canvas.toDataURL('image/jpeg', 0.7);
+                        
+                        // เก็บค่าที่ย่อแล้วลงตัวแปร
+                        currentImageBase64 = compressedDataUrl;
+
+                        // อัปเดต UI แสดงตัวอย่าง
+                        const preview = document.getElementById('preview');
+                        const placeholder = document.getElementById('uploadPlaceholder');
+                        const removeBtn = document.getElementById('removeImgBtn');
+
+                        preview.src = compressedDataUrl;
+                        preview.style.display = 'block';
+                        placeholder.classList.add('opacity-0');
+                        removeBtn.classList.remove('hidden');
+                    };
+                }
+                reader.readAsDataURL(file);
+            }
+        }
+
+        function removeImage(e) {
+            if(e) e.stopPropagation();
+            const input = document.getElementById('petImage');
+            const preview = document.getElementById('preview');
+            const placeholder = document.getElementById('uploadPlaceholder');
+            const removeBtn = document.getElementById('removeImgBtn');
+
+            input.value = '';
+            currentImageBase64 = null;
+            preview.style.display = 'none';
+            preview.src = '';
+            placeholder.classList.remove('opacity-0');
+            removeBtn.classList.add('hidden');
+        }
+
+        function resetForm() {
+            document.getElementById('petForm').reset();
+            removeImage(null);
+        }
+
+        // ==========================================
+        // 🎨 UI Rendering
+        // ==========================================
+        function renderPets(data) {
+            const grid = document.getElementById('petGrid');
+            const empty = document.getElementById('emptyState');
+            const count = document.getElementById('count');
+            
+            grid.innerHTML = '';
+            count.innerText = data.length;
+
+            if (data.length === 0) {
+                empty.classList.remove('hidden');
+                return;
+            } else {
+                empty.classList.add('hidden');
+            }
+
+            data.forEach((pet, index) => {
+                // CHANGED: Access lowercase keys
+                let typeColor = 'bg-slate-100 text-slate-600';
+                if(pet.pettype === 'สุนัข') typeColor = 'bg-orange-100 text-orange-600';
+                else if(pet.pettype === 'แมว') typeColor = 'bg-blue-100 text-blue-600';
+                else if(pet.pettype === 'นก') typeColor = 'bg-sky-100 text-sky-600';
+
+                const displayImage = pet.image || 'https://images.unsplash.com/photo-1583337130417-3346a1be7dee?ixlib=rb-4.0.3&auto=format&fit=crop&w=500&q=60';
+                
+                const dateObj = new Date(pet.created_at);
+                const dateStr = dateObj.toLocaleDateString('th-TH', { day: 'numeric', month: 'short', year: '2-digit' });
+
+                const delay = index < 5 ? `animation-delay: ${index * 100}ms` : '';
+
+                const card = `
+                    <div class="bg-white rounded-3xl p-3 shadow-sm hover:shadow-xl transition-all duration-300 border border-slate-100 group fade-in" style="${delay}">
+                        <div class="relative h-48 rounded-2xl overflow-hidden bg-slate-100 mb-3">
+                            <img src="${displayImage}" alt="${pet.petname}" class="w-full h-full object-cover group-hover:scale-105 transition-transform duration-500">
+                            <div class="absolute top-3 left-3">
+                                <span class="${typeColor} text-xs font-bold px-3 py-1.5 rounded-full shadow-sm backdrop-blur-md bg-opacity-90">
+                                    ${pet.pettype}
+                                </span>
+                            </div>
+                            <button onclick="deletePet(${pet.id})" class="absolute top-3 right-3 bg-white/30 hover:bg-white text-white hover:text-red-500 w-8 h-8 rounded-full backdrop-blur-md flex items-center justify-center transition-all opacity-0 group-hover:opacity-100 shadow-sm">
+                                <i class="fa-solid fa-trash-can text-sm"></i>
+                            </button>
+                        </div>
+                        
+                        <div class="px-2 pb-2">
+                            <div class="flex justify-between items-end mb-3">
+                                <h3 class="text-xl font-bold text-slate-800 leading-none">${pet.petname}</h3>
+                                <div class="text-right">
+                                    <span class="text-xs text-slate-400 block">${dateStr}</span>
+                                    <span class="text-xs text-slate-500 font-medium">บ้าน ${pet.houseno}</span>
+                                </div>
+                            </div>
+                            
+                            <div class="space-y-2 bg-slate-50 rounded-xl p-3">
+                                <div class="flex items-center gap-3 text-sm text-slate-600">
+                                    <div class="w-6 flex justify-center"><i class="fa-solid fa-user text-secondary/70"></i></div>
+                                    <span class="truncate font-medium">${pet.ownername}</span>
+                                </div>
+                                <div class="flex items-center gap-3 text-sm text-slate-600">
+                                    <div class="w-6 flex justify-center"><i class="fa-solid fa-phone text-accent/70"></i></div>
+                                    <a href="tel:${pet.phone}" class="hover:text-primary transition font-medium">${pet.phone}</a>
+                                </div>
+                            </div>
+                        </div>
+                    </div>
+                `;
+                grid.innerHTML += card;
+            });
+        }
+
+        function filterPets() {
+            const query = document.getElementById('searchInput').value.toLowerCase();
+            const filtered = pets.filter(pet => {
+                // CHANGED: Access lowercase keys
+                return (pet.ownername && pet.ownername.toLowerCase().includes(query)) || 
+                       (pet.houseno && pet.houseno.toLowerCase().includes(query)) ||
+                       (pet.petname && pet.petname.toLowerCase().includes(query));
+            });
+            renderPets(filtered);
+        }
+
+        // UX Utils
+        function setLoading(isLoading) {
+            const overlay = document.getElementById('loadingOverlay');
+            if(isLoading) {
+                overlay.classList.remove('hidden');
+            } else {
+                overlay.classList.add('hidden');
+            }
+        }
+
+        function showToast(message, isError = false) {
+            const toast = document.getElementById('toast');
+            const msg = document.getElementById('toastMessage');
+            const iconContainer = toast.querySelector('div.rounded-full');
+            
+            msg.innerText = message;
+            
+            if(isError) {
+                iconContainer.className = 'bg-red-500 rounded-full p-1';
+                iconContainer.innerHTML = '<i class="fa-solid fa-exclamation text-xs"></i>';
+            } else {
+                iconContainer.className = 'bg-emerald-500 rounded-full p-1';
+                iconContainer.innerHTML = '<i class="fa-solid fa-check text-xs"></i>';
+            }
+
+            toast.classList.remove('translate-y-32', 'opacity-0');
+            setTimeout(() => {
+                toast.classList.add('translate-y-32', 'opacity-0');
+            }, 3000);
+        }
+
+        function scrollToForm() {
+            const form = document.getElementById('registerSection');
+            const navHeight = 80;
+            const elementPosition = form.getBoundingClientRect().top;
+            const offsetPosition = elementPosition + window.pageYOffset - navHeight;
+
+            window.scrollTo({
+                top: offsetPosition,
+                behavior: "smooth"
+            });
+        }
+    </script>
+</body>
+</html>
